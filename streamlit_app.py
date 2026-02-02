@@ -191,15 +191,6 @@ st.markdown("""
         transform: translateY(-1px);
     }
     
-    /* FILTERS */
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    
     /* ORDER TRACKING */
     .order-status {
         background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
@@ -565,7 +556,4 @@ if st.session_state.order_placed and st.session_state.order_id:
 # 🎯 FOOTER
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; padding: 40px 20px; background: #f8f9fa; border-radius: 12px; margin-top: 30px;'>
-    <h3>🍕 FoodFast - Fast Food Delivery</h3>
-    <p>Download our app for faster ordering and exclusive deals!</p>
-    <div style='display: flex; justify-content: center; gap:
+<div style='text-align: center; padding: 40px 20px; background: #f8f9fa; border-radius: 12px; margin-top:
