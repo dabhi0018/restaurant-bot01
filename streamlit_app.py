@@ -1,75 +1,68 @@
 import streamlit as st
-from twilio.rest import Client
-import google.generativeai as genai
-from dotenv import load_dotenv
-import os
+from utils.twilio_service import WhatsAppService
 
-# Load environment variables
-load_dotenv()
+# Initialize WhatsApp service
+whatsapp = WhatsAppService()
 
-# Configure Gemini AI (for order queries/assistance)
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-pro")
+# Streamlit App
+st.title("🍕 WhatsApp Food Ordering System")
+st.write("Send food orders via WhatsApp!")
 
-# Initialize cart in session state (replicates CartSidebar.tsx)
-if "cart" not in st.session_state:
-    st.session_state.cart = []
-
-# Twilio WhatsApp Service (replicates whatsappService.ts)
-def send_whatsapp_order(order_details):
-    try:
-        client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
-        message = client.messages.create(
-            body=f"New Fusion Food Lab Order:\n{order_details}",
-            from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_NUMBER')}",
-            to=f"whatsapp:{os.getenv('RESTAURANT_WHATSAPP_NUMBER')}"
-        )
-        return True
-    except Exception as e:
-        st.error(f"Twilio Error: {str(e)}")
-        return False
-
-# App UI
-st.title("🍴 Fusion Food Lab")
-st.subheader("Quantum-Infused Dining")
-
-# Display Menu (replicates FoodCard.tsx)
-menu = [
-    {"name": "Quantum Burger", "desc": "Juicy patty with quark cheese & teleportation fries", "price": "$12.99"},
-    {"name": "Nano Salad", "desc": "Microgreens with molecular dressing & quantum croutons", "price": "$8.99"},
-    {"name": "Black Hole Shake", "desc": "Dark chocolate shake with gravitational whipped cream", "price": "$6.99"}
-]
-
-st.write("### Our Menu")
-cols = st.columns(3)
-for idx, item in enumerate(menu):
-    with cols[idx %3]:
-        st.markdown(f"**{item['name']}**")
-        st.write(item['desc'])
-        st.write(f"Price: {item['price']}")
-        if st.button("Add to Cart", key=f"add_{idx}"):
-            st.session_state.cart.append(item)
-            st.success(f"Added {item['name']} to cart!")
-
-# Cart Sidebar
-st.sidebar.title("🛒 Your Cart")
-if st.session_state.cart:
-    total = sum(float(i['price'].replace('$','')) for i in st.session_state.cart)
-    for item in st.session_state.cart:
-        st.sidebar.write(f"- {item['name']}: {item['price']}")
-    st.sidebar.write(f"**Total: ${total:.2f}**")
+# UI for sending WhatsApp messages
+with st.form("send_message"):
+    st.subheader("Send Order via WhatsApp")
     
-    if st.sidebar.button("📤 Send Order via WhatsApp"):
-        order_text = "\n".join([f"{i['name']} ({i['price']})" for i in st.session_state.cart]) + f"\nTotal: ${total:.2f}"
-        if send_whatsapp_order(order_text):
-            st.sidebar.success("Order sent to restaurant! 🍕")
-            st.session_state.cart = []
-else:
-    st.sidebar.write("Your cart is empty!")
+    phone_number = st.text_input(
+        "Customer Phone Number", 
+        placeholder="+1234567890"
+    )
+    
+    # Food menu
+    food_items = {
+        "🍕 Pizza": 12.99,
+        "🍔 Burger": 8.99,  
+        "🌮 Tacos": 6.99,
+        "🍝 Pasta": 10.99
+    }
+    
+    selected_food = st.selectbox("Select Food Item", list(food_items.keys()))
+    quantity = st.number_input("Quantity", min_value=1, value=1)
+    
+    # Calculate total
+    total = food_items[selected_food] * quantity
+    st.write(f"**Total: ${total:.2f}**")
+    
+    submitted = st.form_submit_button("Send WhatsApp Order")
+    
+    if submitted:
+        if phone_number:
+            # Create order message
+            order_msg = f"""
+🍽️ **NEW ORDER**
 
-# Gemini Chat (optional customer support)
-st.write("### Chat with Our Quantum Waiter")
-user_query = st.text_input("Ask about menu items or your order:")
-if user_query:
-    response = model.generate_content(f"Act as a friendly waiter for Fusion Food Lab. Answer: {user_query}")
-    st.write(f"🤖 {response.text}")
+Item: {selected_food}
+Quantity: {quantity}
+Total: ${total:.2f}
+
+Reply 'CONFIRM' to confirm your order!
+            """
+            
+            # Send WhatsApp message
+            success, result = whatsapp.send_message(phone_number, order_msg)
+            
+            if success:
+                st.success(f"✅ Order sent to {phone_number}!")
+                st.balloons()
+            else:
+                st.error(f"❌ Failed to send: {result}")
+        else:
+            st.error("Please enter a phone number")
+
+# Display recent orders (you can expand this with database)
+st.subheader("📋 Recent Orders")
+if 'orders' not in st.session_state:
+    st.session_state.orders = []
+
+# Show orders (this is just for demo)
+for i, order in enumerate(st.session_state.orders[-5:]):  # Show last 5
+    st.write(f"{i+1}. {order}")
