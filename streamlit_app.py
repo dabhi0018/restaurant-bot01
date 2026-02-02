@@ -1,135 +1,184 @@
 import streamlit as st
 import google.generativeai as genai
-import requests
+import os
 import json
-from datetime import datetime
 
-# 1. SETUP THE PAGE
-st.set_page_config(page_title="My AI Restaurant", page_icon="🍔")
-st.title("🍔 Welcome to The AI Burger Joint")
-st.write("I am your AI Waiter. Ask me about the menu or place an order!")
+# Configure page settings
+st.set_page_config(
+    page_title="WhatsApp Food Order Generator",
+    page_icon="🍔",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# 2. CONFIGURE GEMINI API
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    st.error("API Key not found. Please set it in secrets.")
+# Custom CSS to make it look a bit nicer
+st.markdown("""
+<style>
+    .stTextArea textarea {
+        font-size: 14px;
+    }
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1E293B;
+    }
+    .sub-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #334155;
+        margin-top: 1rem;
+    }
+    .info-box {
+        background-color: #EFF6FF;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid #BFDBFE;
+        color: #1E40AF;
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# 3. CONFIGURE WHATSAPP (Twilio)
-# You'll need to add these to your Streamlit secrets
-WHATSAPP_ACCOUNT_SID = st.secrets.get("TWILIO_ACCOUNT_SID", "")
-WHATSAPP_AUTH_TOKEN = st.secrets.get("TWILIO_AUTH_TOKEN", "")
-TWILIO_WHATSAPP_NUMBER = st.secrets.get("TWILIO_WHATSAPP_NUMBER", "")  # e.g., "whatsapp:+14155552671"
-YOUR_WHATSAPP_NUMBER = st.secrets.get("YOUR_WHATSAPP_NUMBER", "")  # e.g., "whatsapp:+919999999999"
-
-# 4. DEFINE THE MENU
-restaurant_menu = """
-MENU:
-1. Classic Burger - $10
-2. Cheese Pizza - $12
-3. Spicy Pasta - $11
-4. Coke / Sprite - $2
-5. Chocolate Cake - $5
-
-IMPORTANT INSTRUCTIONS FOR AI:
-- You are a polite waiter.
-- Answer questions about the menu.
-- When a customer completes their order, you MUST end your response with:
-  [ORDER_COMPLETE: Item1 ($10), Item2 ($12), Total: $22]
-- This special format helps the system send the order to WhatsApp.
-- Keep answers short and friendly.
-"""
-
-# 5. INITIALIZE CHAT HISTORY
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.messages.append({"role": "user", "parts": [restaurant_menu]})
-    st.session_state.messages.append({"role": "model", "parts": ["Understood. I am ready to take orders."]})
-
-# 6. FUNCTION TO SEND WHATSAPP MESSAGE
-def send_whatsapp_order(order_details):
-    """Send order details to your WhatsApp using Twilio"""
-    if not WHATSAPP_ACCOUNT_SID or not WHATSAPP_AUTH_TOKEN:
-        st.warning("⚠️ WhatsApp integration not set up. Order received but not sent to WhatsApp.")
-        return False
-    
-    try:
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{WHATSAPP_ACCOUNT_SID}/Messages.json"
-        
-        message_body = f"""
-🍔 NEW ORDER RECEIVED! 🍔
-
-{order_details}
-
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Please prepare this order!
-        """
-        
-        data = {
-            "From": TWILIO_WHATSAPP_NUMBER,
-            "To": YOUR_WHATSAPP_NUMBER,
-            "Body": message_body
-        }
-        
-        response = requests.post(
-            url,
-            data=data,
-            auth=(WHATSAPP_ACCOUNT_SID, WHATSAPP_AUTH_TOKEN)
-        )
-        
-        if response.status_code == 201:
-            st.success("✅ Order sent to your WhatsApp!")
-            return True
-        else:
-            st.error(f"Error sending WhatsApp: {response.text}")
-            return False
-            
-    except Exception as e:
-        st.error(f"WhatsApp error: {e}")
-        return False
-
-# 7. DISPLAY CHAT HISTORY
-for message in st.session_state.messages[2:]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["parts"][0])
-
-# 8. HANDLE USER INPUT
-if prompt := st.chat_input("What would you like to order?"):
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    
-    # Add user message to history
-    st.session_state.messages.append({"role": "user", "parts": [prompt]})
-
-    # Get response from Gemini
-    try:
-        model = genai.GenerativeModel('gemini-pro')
-        chat_history = [
-            {"role": m["role"], "parts": m["parts"]} 
-            for m in st.session_state.messages
+def init_session_state():
+    if 'menu_items' not in st.session_state:
+        st.session_state.menu_items = [
+            {"name": "Cheesy Smash Burger", "price": "$12"},
+            {"name": "Pepperoni Pizza XL", "price": "$18"},
+            {"name": "Truffle Fries", "price": "$8"}
         ]
-        
-        response = model.generate_content(chat_history)
-        response_text = response.text
-        
-        # Display AI response
-        with st.chat_message("model"):
-            st.markdown(response_text)
-        
-        # Add AI response to history
-        st.session_state.messages.append({"role": "model", "parts": [response_text]})
-        
-        # 9. CHECK IF ORDER IS COMPLETE
-        if "[ORDER_COMPLETE:" in response_text:
-            # Extract order details
-            order_start = response_text.find("[ORDER_COMPLETE:")
-            order_end = response_text.find("]", order_start)
-            order_details = response_text[order_start + 15:order_end]
+    if 'generated_content' not in st.session_state:
+        st.session_state.generated_content = None
+
+init_session_state()
+
+# Sidebar Configuration
+with st.sidebar:
+    st.header("🏪 Restaurant Config")
+    
+    restaurant_name = st.text_input("Restaurant Name", value="Burger & Bites")
+    cuisine = st.text_input("Cuisine / Vibe", value="American Fast Food")
+    upi_id = st.text_input("UPI ID / Payment Link", value="9876543210@upi")
+    
+    st.divider()
+    
+    st.subheader("📋 Menu Items")
+    
+    # Simple form to add items
+    with st.form("add_item_form", clear_on_submit=True):
+        c1, c2 = st.columns([2, 1])
+        new_name = c1.text_input("Item Name")
+        new_price = c2.text_input("Price")
+        submitted = st.form_submit_button("Add Item")
+        if submitted and new_name and new_price:
+            st.session_state.menu_items.append({"name": new_name, "price": new_price})
+            st.rerun()
+
+    # List items with delete button
+    if st.session_state.menu_items:
+        st.write("Current Menu:")
+        for i, item in enumerate(st.session_state.menu_items):
+            col1, col2 = st.columns([4, 1])
+            col1.text(f"{item['name']} - {item['price']}")
+            if col2.button("🗑️", key=f"del_{i}"):
+                st.session_state.menu_items.pop(i)
+                st.rerun()
+    else:
+        st.warning("No items in menu!")
+
+    st.divider()
+    tone = st.selectbox("Tone", ["Fun & Hungry", "Polite & Professional", "Luxury & Minimal"], index=0)
+
+# Main Content
+st.markdown('<div class="main-header">🍔 WhatsApp Chef</div>', unsafe_allow_html=True)
+st.markdown("Generate perfect, emoji-rich scripts for your manual ordering system.")
+
+# Check for API Key
+api_key = os.environ.get("API_KEY")
+if not api_key:
+    st.warning("⚠️ API_KEY not found in environment variables. Please check your settings.")
+    # Fallback for manual entry if needed, though strictly we should rely on env
+    api_key = st.text_input("Or enter your Google API Key manually:", type="password")
+
+if st.button("✨ Generate WhatsApp Copy", type="primary", use_container_width=True):
+    if not api_key:
+        st.error("Please provide a valid API Key to proceed.")
+    elif not st.session_state.menu_items:
+        st.error("Please add at least one menu item.")
+    else:
+        try:
+            genai.configure(api_key=api_key)
+            # Using the model specified in instructions suitable for text tasks
+            model = genai.GenerativeModel('gemini-3-flash-preview')
+
+            menu_string = "\n".join([f"- {item['name']} ({item['price']})" for item in st.session_state.menu_items])
+
+            prompt = f"""
+            Act as a professional Restaurant Manager and Copywriter.
+            I need you to write 3 specific text blocks formatted effectively for WhatsApp (using Bold *, Italics _, and Emojis).
             
-            # Send to WhatsApp
-            send_whatsapp_order(order_details)
+            Restaurant Name: {restaurant_name}
+            Cuisine/Vibe: {cuisine}
+            Tone: {tone} (Make it {tone.lower()})
+            UPI/Payment Info: {upi_id}
+
+            Menu Items to Feature:
+            {menu_string}
+
+            Requirements:
+            1. **Welcome & Menu Message**: A friendly greeting. A clear list of the provided food items. Call to action: "Reply with your order!".
+            2. **Bill & Payment Template**: A template with placeholders like [ITEM 1], [ITEM 2], and [TOTAL PRICE]. Polite request for screenshot. Include the UPI ID: {upi_id}.
+            3. **Order Sent to Kitchen Message**: Confirmation that order is received. Estimated time (15-20 mins).
+            
+            Ensure strict WhatsApp formatting:
+            - Use *text* for bold.
+            - Use _text_ for italics.
+            - Use plenty of appetizing emojis.
+
+            Return the response in JSON format with keys: 'welcome', 'bill', 'kitchen'.
+            """
+
+            with st.spinner("Chef is cooking up your scripts... 🍳"):
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        response_mime_type="application/json"
+                    )
+                )
+                
+                try:
+                    content = json.loads(response.text)
+                    st.session_state.generated_content = content
+                    st.success("Scripts generated successfully!")
+                except json.JSONDecodeError:
+                    st.error("Error parsing the response. Please try again.")
+                    st.write(response.text)
+                    
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+
+# Display Results
+if st.session_state.generated_content:
+    st.divider()
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown('<div class="sub-header">👋 Welcome</div>', unsafe_allow_html=True)
+        st.caption("Auto-reply for new messages")
+        st.text_area("Copy this:", value=st.session_state.generated_content.get('welcome', ''), height=300)
         
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+    with col2:
+        st.markdown('<div class="sub-header">💸 Bill Template</div>', unsafe_allow_html=True)
+        st.caption("Paste and edit for each order")
+        st.text_area("Copy this:", value=st.session_state.generated_content.get('bill', ''), height=300)
+        
+    with col3:
+        st.markdown('<div class="sub-header">🍳 Kitchen</div>', unsafe_allow_html=True)
+        st.caption("Confirmation message")
+        st.text_area("Copy this:", value=st.session_state.generated_content.get('kitchen', ''), height=300)
+
+    st.markdown("""
+    <div class="info-box">
+        <strong>💡 Pro Tip:</strong> Copy these strings into your Python/Twilio bot code as string templates!
+    </div>
+    """, unsafe_allow_html=True)
