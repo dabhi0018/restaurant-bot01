@@ -1,0 +1,5 @@
+{
+  "name": "WhatsApp Food Order Generator",
+  "description": "A smart assistant for restaurant owners to generate perfectly formatted, emoji-rich WhatsApp ordering scripts using Gemini AI.",
+  "requestFramePermissions": []
+}
