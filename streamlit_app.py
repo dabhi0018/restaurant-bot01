@@ -11,19 +11,19 @@ st.write("I am your AI Food Scientist. Explore our molecular gastronomy menu and
 
 # 2. CONFIGURE GEMINI API
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    genai.configure(api_key=st.secrets["AIzaSyDhPUcjjcRQCyVowTifHsoxKsIaV2G55fg"])
 except:
     st.error("API Key not found. Please set it in secrets.")
 
 # 3. CONFIGURE WHATSAPP (Twilio)
-WHATSAPP_ACCOUNT_SID = st.secrets.get("TWILIO_ACCOUNT_SID", "")
-WHATSAPP_AUTH_TOKEN = st.secrets.get("TWILIO_AUTH_TOKEN", "")
-TWILIO_WHATSAPP_NUMBER = st.secrets.get("TWILIO_WHATSAPP_NUMBER", "")  # e.g., "whatsapp:+14155552671"
-YOUR_WHATSAPP_NUMBER = st.secrets.get("YOUR_WHATSAPP_NUMBER", "")  # e.g., "whatsapp:+919876543210"
+WHATSAPP_ACCOUNT_SID = st.secrets.get("AC1be6ae28d832ac29874458c8a27a1eb7", "")
+WHATSAPP_AUTH_TOKEN = st.secrets.get("5d52edbf5710e0b09cec5ef177d5ddb8", "")
+TWILIO_WHATSAPP_NUMBER = st.secrets.get("+12086827968", "")  # e.g., "whatsapp:+14155552671"
+YOUR_WHATSAPP_NUMBER = st.secrets.get("+918849594887", "")  # e.g., "whatsapp:+919876543210"
 
 # 4. DEFINE THE MENU
 restaurant_menu = """
-🧪 FUSION FOOD LAB MENU 🧪
+🧪 Chemist Bits 🧪
 
 (A) VADAPAV SERIES (High-Energy Reactions)
 1. Mumbaiya Vada Pav     - ₹25
